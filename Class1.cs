@@ -1,13 +1,18 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Gallop;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Spectre.Console;
 using System.IO.Compression;
+using System.Text;
 using UmamusumeResponseAnalyzer;
 using UmamusumeResponseAnalyzer.Plugin;
+using SkillData = UmamusumeResponseAnalyzer.Entities.SkillData;
 
 namespace SkillEffectPlugin
 {
     public class SkillEffectPlugin : IPlugin
     {
+        const string SKILL_DATA_FILEPATH = "./PluginData/SkillEffectPlugin/skill_data.br";
         public Version Version => new(1, 0, 0);
         [PluginDescription("显示技能期望收益")]
         public string Name => "SkillEffectPlugin";
@@ -15,9 +20,15 @@ namespace SkillEffectPlugin
         public string[] Targets => [];
         public async Task UpdatePlugin(ProgressContext ctx)
         {
-            var progress = ctx.AddTask($"[{Name}] 更新");
+            var progress = ctx.AddTask($"[[{Name}]] 更新");
 
             using var client = new HttpClient();
+
+            var assetsHost = string.IsNullOrEmpty(Config.Updater.CustomDatabaseRepository) ? "https://github.com/UmamusumeResponseAnalyzer/Assets/raw/refs/heads/main/".AllowMirror() : Config.Updater.CustomDatabaseRepository;
+            var brUrl = $"{assetsHost}/GameData/ja-JP/skill_data.br";
+            var br = await client.GetByteArrayAsync(brUrl);
+            File.WriteAllBytes(SKILL_DATA_FILEPATH, br);
+
             using var resp = await client.GetAsync($"https://api.github.com/repos/URA-Plugins/{Name}/releases/latest");
             var json = await resp.Content.ReadAsStringAsync();
             var jo = JObject.Parse(json);
@@ -31,11 +42,7 @@ namespace SkillEffectPlugin
             }
             progress.Increment(25);
 
-            var downloadUrl = jo["assets"][0]["browser_download_url"].ToString();
-            if (Config.Updater.IsGithubBlocked && !Config.Updater.ForceUseGithubToUpdate)
-            {
-                downloadUrl = downloadUrl.Replace("https://", "https://gh.shuise.dev/");
-            }
+            var downloadUrl = jo["assets"][0]["browser_download_url"].ToString().AllowMirror();
             using var msg = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
             using var stream = await msg.Content.ReadAsStreamAsync();
             var buffer = new byte[8192];
@@ -55,11 +62,11 @@ namespace SkillEffectPlugin
 
         [PluginSetting, PluginDescription("设置显示顺序：0是按游戏内显示，1是按期望收益从大到小，2是按每点Pt收益从大到小排序")]
         public int DisplayOrder { get; set; } = 0;
-        [PluginSetting, PluginDescription("最小收益: 小于这个值的不会显示")]
+        [PluginSetting, PluginDescription("最小收益：小于这个值的不会显示")]
         public double MinimumExpectedEffect { get; set; } = 0;
-        [PluginSetting, PluginDescription("赛道: 日服2505LOH/川崎2100/东京2400")]
+        [PluginSetting, PluginDescription("赛道：PluginData/SkillEffectPlugin/里的文件夹名")]
         public string Race { get; set; } = string.Empty;
-        [PluginSetting, PluginDescription("跑法:逃/先/差/追")]
+        [PluginSetting, PluginDescription("跑法：逃/先/差/追")]
         public string RunningStyle { get; set; } = string.Empty;
 
         /// <summary>
@@ -69,18 +76,26 @@ namespace SkillEffectPlugin
         /// return {name,effect};
         /// }))
         /// </summary>
-        Dictionary<string, double> Effects
-        {
-            get
-            {
-                return string.IsNullOrEmpty(Race) || string.IsNullOrEmpty(RunningStyle)
-                    ? []
-                    : JArray.Parse(File.ReadAllText(@$".\PluginData\给出技能在赛道中的期望收益\{Race}\{RunningStyle}.json")).ToDictionary(x => x["name"].ToString(), x => double.Parse(x["effect"].ToString()[..4]));
-            }
-        }
+        private List<SkillData> SkillData { get; set; } = [];
+        public Dictionary<string, double> Effects { get; set; } = [];
 
         public void Initialize()
         {
+            Directory.CreateDirectory("./PluginData/SkillEffectPlugin/");
+            if (File.Exists(SKILL_DATA_FILEPATH))
+            {
+                SkillData = JsonConvert.DeserializeObject<List<SkillData>>(Encoding.UTF8.GetString(Brotli.Decompress(File.ReadAllBytes(SKILL_DATA_FILEPATH))));
+            }
+            if (!string.IsNullOrEmpty(Race) && !string.IsNullOrEmpty(RunningStyle))
+            {
+                var json = JArray.Parse(File.ReadAllText(@$".\PluginData\{Name}\{Race}\{RunningStyle}.json"));
+                foreach (var item in json.OrderByDescending(x => double.Parse(x["effect"].ToString()[..4])))
+                {
+                    var name = item["name"].ToString();
+                    var effect = double.Parse(item["effect"].ToString()[..4]);
+                    Effects.TryAdd(name, effect);
+                }
+            }
         }
 #warning TODO: 有多个剧本可进化技能时，显示最好的两个？同时显示进化前和进化后的？
         [Analyzer]
@@ -135,9 +150,11 @@ namespace SkillEffectPlugin
                 foreach (var (baseName, bestName, Effect, cost, order) in list.Where(x => x.Effect >= MinimumExpectedEffect))
                 {
                     if (baseName != bestName)
-                        AnsiConsole.MarkupLine($"[green]Skill:[/][yellow]{baseName}->{bestName}[/] [green]Effect:[/][yellow]{Effect}[/] Cost: {Effect * 1000 / cost:0.00}");
-                    else
+                        AnsiConsole.MarkupLine($"[green]Skill:[/][#FF75BD]{baseName}->{bestName}[/] [green]Effect:[/][yellow]{Effect}[/] Cost: {Effect * 1000 / cost:0.00}");
+                    else if ((SkillManagerGenerator.Default.GetSkillByName(baseName)?.Rarity ?? 0) == 2)
                         AnsiConsole.MarkupLine($"[green]Skill:[/][yellow]{baseName}[/] [green]Effect:[/][yellow]{Effect}[/] Cost: {Effect * 1000 / cost:0.00}");
+                    else
+                        AnsiConsole.MarkupLine($"[green]Skill:[/]{baseName} [green]Effect:[/][yellow]{Effect}[/] Cost: {Effect * 1000 / cost:0.00}");
                 }
             }
         }
