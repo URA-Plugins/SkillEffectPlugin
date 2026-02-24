@@ -13,7 +13,6 @@ namespace SkillEffectPlugin
     public class SkillEffectPlugin : IPlugin
     {
         const string SKILL_DATA_FILEPATH = "./PluginData/SkillEffectPlugin/skill_data.br";
-        public Version Version => new(1, 0, 0);
         [PluginDescription("显示技能期望收益")]
         public string Name => "SkillEffectPlugin";
         public string Author => "离披&ウマ娘.攻略.tools";
@@ -33,7 +32,7 @@ namespace SkillEffectPlugin
             var json = await resp.Content.ReadAsStringAsync();
             var jo = JObject.Parse(json);
 
-            var isLatest = ("v" + Version.ToString()).Equals("v" + jo["tag_name"]?.ToString());
+            var isLatest = ("v" + ((IPlugin)this).Version.ToString()).Equals("v" + jo["tag_name"]?.ToString());
             if (isLatest)
             {
                 progress.Increment(progress.MaxValue);
