@@ -1,24 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<TargetFramework>net10.0</TargetFramework>
+    <IsUraPlugin>true</IsUraPlugin>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RunPostBuildEvent>Always</RunPostBuildEvent>
+    <Version>1.0.0</Version>
+
+    <!-- URA 插件元数据 -->
+    <PluginInternalName>SkillEffectPlugin</PluginInternalName>
+    <PluginDisplayName>显示技能期望收益</PluginDisplayName>
+    <PluginAuthor>离披&amp;ウマ娘.攻略.tools</PluginAuthor>
+    <PluginDescription>(仍在开发中)没有考虑边际效应，仅供参考</PluginDescription>
+    <PluginRepositoryUrl>https://github.com/URA-Plugins/SkillEffectPlugin</PluginRepositoryUrl>
   </PropertyGroup>
-
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy /Y &quot;$(TargetPath)&quot; &quot;%25localappdata%25/UmamusumeResponseAnalyzer/Plugins/SkillEffectPlugin/&quot;" />
-  </Target>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\UmamusumeResponseAnalyzer\UmamusumeResponseAnalyzer\UmamusumeResponseAnalyzer.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="manifest.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
 
 </Project>
