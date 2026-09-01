@@ -15,4 +15,8 @@
     <PluginRepositoryUrl>https://github.com/URA-Plugins/SkillEffectPlugin</PluginRepositoryUrl>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="UmamusumeResponseAnalyzer" Version="2026.9.1" />
+  </ItemGroup>
+
 </Project>

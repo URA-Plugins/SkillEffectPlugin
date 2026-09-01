@@ -25,10 +25,10 @@
 
 ## 构建
 
-仓库通过 Git submodule 固定 Host 源码。克隆后在仓库根执行：
+仓库通过 NuGet 包引用 Host API。克隆后在仓库根执行：
 
 ```powershell
-git -c core.longpaths=true submodule update --init --recursive
 dotnet build .\SkillEffectPlugin.csproj -c Release -m:1 -p:RuntimeIdentifier=win-x64 -p:SelfContained=false -p:PlatformTarget=AnyCPU -p:DeployUraPluginToLocalAppDataOnBuild=false
-dotnet run --project .\tests\SkillEffectPluginSmoke\SkillEffectPluginSmoke.csproj -c Release -p:GenerateUraPluginManifestOnBuild=false -p:PackageUraPluginOnBuild=false -p:DeployUraPluginToLocalAppDataOnBuild=false
 ```
+
+Host-dependent smoke 位于 `URA-Plugins.Integration/tests/SkillEffectPluginSmoke`。
