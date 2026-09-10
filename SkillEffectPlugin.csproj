@@ -16,7 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="UmamusumeResponseAnalyzer" Version="2026.9.1" />
+    <PackageReference Include="UmamusumeResponseAnalyzer" Version="*" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>
