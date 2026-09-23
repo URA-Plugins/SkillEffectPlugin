@@ -22,12 +22,12 @@ try
     InitializeHostDatabaseForSmoke();
     AssertConfigDraftSaveAndCancelSemantics();
     using var ui = new WorkspaceSmokeSession();
-    AssertDefaultSettingsDoNotSubscribeOnStarted(ui);
-    AssertAutoUpdateSubscriptionIsHostOwned(ui);
+    AssertDefaultSettingsSkipStartupUpdate(ui);
+    AssertStartupUpdateUsesCancellationToken(ui);
     PreparePluginData();
 
     var plugin = new SkillEffectPlugin.SkillEffectPlugin();
-    using var context = new SmokePluginContext(ui.Application);
+    var context = new SmokePluginContext(ui.Application);
     Workspace? target = null;
     try
     {
@@ -59,7 +59,7 @@ try
     }
     finally
     {
-        plugin.Dispose();
+        plugin.DisposeAsync().GetAwaiter().GetResult();
     }
 
     var retained = Workspace.Create("技能收益");
@@ -152,19 +152,17 @@ static void InitializeHostDatabaseForSmoke()
 
 Console.WriteLine("PASS SkillEffectPlugin smoke");
 
-static void AssertDefaultSettingsDoNotSubscribeOnStarted(WorkspaceSmokeSession ui)
+static void AssertDefaultSettingsSkipStartupUpdate(WorkspaceSmokeSession ui)
 {
     var plugin = new SkillEffectPlugin.SkillEffectPlugin();
-    using var context = new SmokePluginContext(ui.Application);
+    var context = new SmokePluginContext(ui.Application);
     try
     {
         plugin.Initialize(context);
         AssertTrue(
             ReferenceEquals(Workspace.Current, ui.Bootstrap),
             "Default initialization must keep the bootstrap workspace active.");
-        AssertTrue(
-            !context.Events.HasStartedHandlers,
-            "AutoUpdateSkillEffects=false must not register an OnStarted handler.");
+        plugin.StartAsync().GetAwaiter().GetResult();
 
         var settingsPath = Path.Combine("PluginData", "SkillEffectPlugin", "settings.json");
         var settings = File.ReadAllText(settingsPath);
@@ -172,13 +170,13 @@ static void AssertDefaultSettingsDoNotSubscribeOnStarted(WorkspaceSmokeSession u
     }
     finally
     {
-        plugin.Dispose();
+        plugin.DisposeAsync().GetAwaiter().GetResult();
     }
 
     Directory.Delete("PluginData", recursive: true);
 }
 
-static void AssertAutoUpdateSubscriptionIsHostOwned(WorkspaceSmokeSession ui)
+static void AssertStartupUpdateUsesCancellationToken(WorkspaceSmokeSession ui)
 {
     var dataDirectory = Path.Combine("PluginData", "SkillEffectPlugin");
     Directory.CreateDirectory(dataDirectory);
@@ -195,17 +193,24 @@ static void AssertAutoUpdateSubscriptionIsHostOwned(WorkspaceSmokeSession ui)
         }
         """);
 
-    using var context = new SmokePluginContext(ui.Application);
+    var context = new SmokePluginContext(ui.Application);
     var plugin = new SkillEffectPlugin.SkillEffectPlugin();
     plugin.Initialize(context);
     AssertTrue(
         ReferenceEquals(Workspace.Current, ui.Bootstrap),
         "Auto-update initialization must keep the bootstrap workspace active.");
-    AssertTrue(context.Events.HasStartedHandlers, "Auto-update initialization must register an OnStarted handler.");
-
-    context.Close();
-    AssertTrue(!context.Events.HasStartedHandlers, "Closing the host context must remove OnStarted handlers.");
-    plugin.Dispose();
+    try
+    {
+        plugin.StartAsync(new CancellationToken(canceled: true)).GetAwaiter().GetResult();
+        throw new InvalidOperationException("The startup download must observe Host cancellation.");
+    }
+    catch (OperationCanceledException)
+    {
+    }
+    finally
+    {
+        plugin.DisposeAsync().GetAwaiter().GetResult();
+    }
 
     Directory.Delete("PluginData", recursive: true);
 }
@@ -287,7 +292,7 @@ static void AssertConfigDraftSaveAndCancelSemantics()
         },
         "close");
 
-    plugin.Dispose();
+    plugin.DisposeAsync().GetAwaiter().GetResult();
     Directory.Delete("PluginData", recursive: true);
 }
 
@@ -372,52 +377,14 @@ static void AssertNearly(double expected, double actual, string message)
         throw new InvalidOperationException($"{message} Expected={expected}, Actual={actual}");
 }
 
-sealed class SmokePluginContext(IApplication application) : IPluginContext, IDisposable
+sealed class SmokePluginContext(IApplication application) : IPluginContext
 {
-    readonly CancellationTokenSource lifetime = new();
-    readonly List<Task> backgroundTasks = [];
-
-    public SmokeHostEvents Events { get; } = new();
-
     public IApplication Application { get; } = application;
-    IPluginHostEvents IPluginContext.Events => Events;
     IPluginAnalyzerRegistry IPluginContext.Analyzers { get; } = new SmokeAnalyzerRegistry();
     public bool IsPluginAvailable(string internalName) => false;
 
-    public void RunBackground(Func<CancellationToken, ValueTask> operation)
-        => backgroundTasks.Add(Task.Run(() => operation(lifetime.Token).AsTask()));
-
-    public void Close()
-    {
-        lifetime.Cancel();
-        try
-        {
-            Task.WhenAll(backgroundTasks).GetAwaiter().GetResult();
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        Events.Clear();
-    }
-
-    public void Dispose()
-    {
-        Close();
-        lifetime.Dispose();
-    }
-}
-
-sealed class SmokeHostEvents : IPluginHostEvents
-{
-    readonly List<Func<CancellationToken, ValueTask>> startedHandlers = [];
-
-    public bool HasStartedHandlers => startedHandlers.Count != 0;
-
-    public void OnStarted(Func<CancellationToken, ValueTask> handler)
-        => startedHandlers.Add(handler);
-
-    public void Clear()
-        => startedHandlers.Clear();
+    public void ReportBackgroundFailure(Exception error)
+        => throw new InvalidOperationException("SkillEffectPlugin background work failed.", error);
 }
 
 sealed class SmokeAnalyzerRegistry : IPluginAnalyzerRegistry

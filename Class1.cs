@@ -57,15 +57,16 @@ namespace SkillEffectPlugin
             Directory.CreateDirectory(DataDirectory);
             var settings = LoadSettings();
             Volatile.Write(ref _snapshot, new(settings, ReadEffects(settings)));
-
-            if (settings.AutoUpdateSkillEffects && !string.IsNullOrWhiteSpace(settings.URACloudBaseUrl))
-                context.Events.OnStarted(
-                    cancellationToken => new(UpdateSkillEffectsAsync(
-                        Snapshot.Settings.URACloudBaseUrl,
-                        cancellationToken)));
         }
 
-        public void Dispose()
+        public async ValueTask StartAsync(CancellationToken cancellationToken = default)
+        {
+            var settings = Snapshot.Settings;
+            if (settings.AutoUpdateSkillEffects && !string.IsNullOrWhiteSpace(settings.URACloudBaseUrl))
+                await UpdateSkillEffectsAsync(settings.URACloudBaseUrl, cancellationToken);
+        }
+
+        public ValueTask DisposeAsync()
         {
             if (_hasPublishedSkillEffectsPanel)
             {
@@ -73,6 +74,7 @@ namespace SkillEffectPlugin
                 _hasPublishedSkillEffectsPanel = false;
             }
             _workspace = null;
+            return ValueTask.CompletedTask;
         }
 
         private SkillEffectSettings LoadSettings()

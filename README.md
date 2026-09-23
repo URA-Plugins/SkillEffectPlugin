@@ -19,7 +19,7 @@
 - `settings.json` 保存 `DisplayOrder`、`MinimumExpectedEffect`、`Race`、`RunningStyle`、`URACloudBaseUrl` 和 `AutoUpdateSkillEffects`。
 - `<Race>/<RunningStyle>.json` 是技能效果数组；每项包含字符串字段 `name` 和 `effect`。
 
-`DisplayOrder` 为 `0` 时按游戏内顺序，为 `1` 时按收益降序，为 `2` 时按技能点性价比降序。配置界面可以保存配置，或从 `<URACloudBaseUrl>/SkillEffects/download` 下载并解压技能效果文件；启用自动更新后，插件在宿主启动事件触发时执行同一更新。
+`DisplayOrder` 为 `0` 时按游戏内顺序，为 `1` 时按收益降序，为 `2` 时按技能点性价比降序。配置界面可以保存配置，或从 `<URACloudBaseUrl>/SkillEffects/download` 下载并解压技能效果文件；启用自动更新后，插件在 `StartAsync` 中执行同一更新。
 
 技能效果值不计算技能组合的边际效应，仅供参考。未配置赛道或跑法、或对应效果文件不存在时，不会加载技能效果数据。
 
