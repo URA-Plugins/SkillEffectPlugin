@@ -11,6 +11,9 @@ using Terminal.Gui.Views;
 using UmamusumeResponseAnalyzer.TerminalGui;
 using UmamusumeResponseAnalyzer.Plugin;
 
+RepositoryChecks.Run();
+Environment.SetEnvironmentVariable("DisableRealDriverIO", "1");
+
 var originalCwd = Directory.GetCurrentDirectory();
 var workspace = Path.Combine(Path.GetTempPath(), "skill-effect-plugin-smoke-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(workspace);
@@ -22,6 +25,8 @@ try
     InitializeHostDatabaseForSmoke();
     AssertConfigDraftSaveAndCancelSemantics();
     using var ui = new WorkspaceSmokeSession();
+    PluginLifecycleSmoke.Run(ui);
+    await SkillPanelSmoke.RunAsync(ui);
     AssertDefaultSettingsSkipStartupUpdate(ui);
     AssertStartupUpdateUsesCancellationToken(ui);
     PreparePluginData();
