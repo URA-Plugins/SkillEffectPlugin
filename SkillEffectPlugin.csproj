@@ -5,13 +5,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>2026.9.26</Version>
+    <Version>2026.10.31</Version>
 
     <!-- URA 插件元数据 -->
     <PluginInternalName>SkillEffectPlugin</PluginInternalName>
     <PluginDisplayName>显示技能期望收益</PluginDisplayName>
     <PluginAuthor>离披&amp;ウマ娘.攻略.tools</PluginAuthor>
     <PluginDescription>未计算技能组合边际效应，仅供参考</PluginDescription>
+    <PluginChangelog>更新构建依赖。</PluginChangelog>
     <PluginRepositoryUrl>https://github.com/URA-Plugins/SkillEffectPlugin</PluginRepositoryUrl>
   </PropertyGroup>
 
