@@ -57,6 +57,10 @@ namespace SkillEffectPlugin
             Directory.CreateDirectory(DataDirectory);
             var settings = LoadSettings();
             Volatile.Write(ref _snapshot, new(settings, ReadEffects(settings)));
+            context.Analyzers.Register<SingleModeCheckEventResponse>(
+                AnalyzerKind.Response,
+                [EndpointPattern.Wildcard("/umamusume/single_mode*/check_event")],
+                invocation => Analyze(invocation.Payload));
         }
 
         public async ValueTask StartAsync(CancellationToken cancellationToken = default)
@@ -336,7 +340,6 @@ namespace SkillEffectPlugin
             return field;
         }
 
-        [ResponseAnalyzer<GameApi.SingleMode.CheckEvent>]
         public ValueTask Analyze(SingleModeCheckEventResponse response)
         {
             if (response.data.unchecked_event_array.Length != 0) return ValueTask.CompletedTask;
@@ -355,7 +358,7 @@ namespace SkillEffectPlugin
         private List<(string baseName, string bestName, double effect, int cost, int order)> CalculateSkillRows(SingleModeCheckEventResponse ev)
         {
             var skills = Database.Skills.Apply(ev.data.chara_info);
-            skills.Evolve(ev.data.chara_info, skills.GetSkills());
+            skills.Evolve(ev.data.chara_info);
             skills.RemoveLearned(ev.data.chara_info);
 
             var rows = new List<(string baseName, string bestName, double effect, int cost, int order)>();
